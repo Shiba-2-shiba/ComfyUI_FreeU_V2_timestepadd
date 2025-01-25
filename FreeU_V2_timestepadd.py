@@ -49,11 +49,15 @@ class FreeU_V2_timestepadd:
         def output_block_patch(h, hsp, transformer_options):
             current_step = transformer_options.get("sampling_step", 0)
             total_steps = transformer_options.get("total_sampling_steps", 1)
+            # ゼロ割を回避するために条件を追加
+        if total_steps <= 1:
+            step_ratio = 0  # デフォルト値を設定
+        else:
             step_ratio = current_step / (total_steps - 1)
 
-            # 指定ステップ範囲外ならスキップ
-            if step_ratio < start_step or step_ratio > end_step:
-                return h, hsp
+        # 指定ステップ範囲外ならスキップ
+        if step_ratio < start_step or step_ratio > end_step:
+            return h, hsp
 
             scale = scale_dict.get(int(h.shape[1]), None)
             if scale is not None:
