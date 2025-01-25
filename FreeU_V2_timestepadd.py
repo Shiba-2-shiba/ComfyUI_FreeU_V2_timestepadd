@@ -1,5 +1,6 @@
 import torch
 import logging
+import comfy.utils
 
 def Fourier_filter(x, threshold, scale):
     # フーリエ変換フィルタリング
@@ -30,8 +31,8 @@ class FreeU_V2_timestepadd:
                 "b2": ("FLOAT", {"default": 1.4, "min": 0.0, "max": 10.0, "step": 0.01}),
                 "s1": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 10.0, "step": 0.01}),
                 "s2": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 10.0, "step": 0.01}),
-                "start_step": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "end_step": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "start_percent": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.001}),
+                "end_percent": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.0, "step": 0.001}),
             }
         }
 
@@ -39,48 +40,41 @@ class FreeU_V2_timestepadd:
     FUNCTION = "patch"
     CATEGORY = "model_patches/unet"
 
-    def patch(self, model, b1, b2, s1, s2, start_step, end_step):
-        # モデル設定
+    def patch(self, model, b1, b2, s1, s2, start_percent, end_percent):
+        model_sampling = model.get_model_object("model_sampling")
+        sigma_start = model_sampling.percent_to_sigma(start_percent)
+        sigma_end = model_sampling.percent_to_sigma(end_percent)
+
+        # モデルのスケーリング情報
         model_channels = model.model.model_config.unet_config["model_channels"]
         scale_dict = {model_channels * 4: (b1, s1), model_channels * 2: (b2, s2)}
         on_cpu_devices = {}
 
         # 出力ブロックのパッチ
         def output_block_patch(h, hsp, transformer_options):
-            # `transformer_options` からステップ情報を取得
-            current_step = transformer_options.get("sampling_step", 0)
-            total_steps = transformer_options.get("total_sampling_steps", 1)
+            sigma = transformer_options["sigmas"][0].item()
 
-            # ゼロ割を防ぐために条件を追加
-            if total_steps <= 1:
-                step_ratio = 0  # デフォルト値を設定
-            else:
-                step_ratio = current_step / (total_steps - 1)
+            # 指定した範囲内のsigmaに基づいて処理
+            if sigma_start >= sigma >= sigma_end:
+                scale = scale_dict.get(int(h.shape[1]), None)
+                if scale is not None:
+                    hidden_mean = h.mean(1).unsqueeze(1)
+                    B = hidden_mean.shape[0]
+                    hidden_max, _ = torch.max(hidden_mean.view(B, -1), dim=-1, keepdim=True)
+                    hidden_min, _ = torch.min(hidden_mean.view(B, -1), dim=-1, keepdim=True)
+                    hidden_mean = (hidden_mean - hidden_min.unsqueeze(2).unsqueeze(3)) / (hidden_max - hidden_min).unsqueeze(2).unsqueeze(3)
 
-            # 指定ステップ範囲外ならスキップ
-            if step_ratio < start_step or step_ratio > end_step:
-                return h, hsp
+                    h[:, :h.shape[1] // 2] = h[:, :h.shape[1] // 2] * ((scale[0] - 1) * hidden_mean + 1)
 
-            # スケーリング処理
-            scale = scale_dict.get(int(h.shape[1]), None)
-            if scale is not None:
-                hidden_mean = h.mean(1).unsqueeze(1)
-                B = hidden_mean.shape[0]
-                hidden_max, _ = torch.max(hidden_mean.view(B, -1), dim=-1, keepdim=True)
-                hidden_min, _ = torch.min(hidden_mean.view(B, -1), dim=-1, keepdim=True)
-                hidden_mean = (hidden_mean - hidden_min.unsqueeze(2).unsqueeze(3)) / (hidden_max - hidden_min).unsqueeze(2).unsqueeze(3)
-
-                h[:, :h.shape[1] // 2] = h[:, :h.shape[1] // 2] * ((scale[0] - 1) * hidden_mean + 1)
-
-                if hsp.device not in on_cpu_devices:
-                    try:
-                        hsp = Fourier_filter(hsp, threshold=1, scale=scale[1])
-                    except:
-                        logging.warning("Device {} does not support the torch.fft functions used in the FreeU node, switching to CPU.".format(hsp.device))
-                        on_cpu_devices[hsp.device] = True
+                    if hsp.device not in on_cpu_devices:
+                        try:
+                            hsp = Fourier_filter(hsp, threshold=1, scale=scale[1])
+                        except:
+                            logging.warning("Device {} does not support the torch.fft functions used in the FreeU node, switching to CPU.".format(hsp.device))
+                            on_cpu_devices[hsp.device] = True
+                            hsp = Fourier_filter(hsp.cpu(), threshold=1, scale=scale[1]).to(hsp.device)
+                    else:
                         hsp = Fourier_filter(hsp.cpu(), threshold=1, scale=scale[1]).to(hsp.device)
-                else:
-                    hsp = Fourier_filter(hsp.cpu(), threshold=1, scale=scale[1]).to(hsp.device)
 
             return h, hsp
 
