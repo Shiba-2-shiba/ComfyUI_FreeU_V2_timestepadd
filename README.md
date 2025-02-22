@@ -19,3 +19,16 @@ start_percentとend_percentで、FreeUの効果範囲を設定できます。
 
 その他のパラメータの設定はFreeU V2と同様です。
 
+## Install
+
+
+以下のコマンドでインストール出来ます。
+
+You can install it with the following command.
+
+
+```bash
+cd Yourdirectory/ComfyUI/custom_nodes
+git clone https://github.com/Shiba-2-shiba/ComfyUI_FreeU_V2_timestepadd.git
+
+```
