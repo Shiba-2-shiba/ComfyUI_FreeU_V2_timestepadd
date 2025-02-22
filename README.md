@@ -19,6 +19,7 @@ start_percentとend_percentで、FreeUの効果範囲を設定できます。
 
 その他のパラメータの設定はFreeU V2と同様です。
 
+---
 ## Install
 
 
@@ -32,3 +33,12 @@ cd Yourdirectory/ComfyUI/custom_nodes
 git clone https://github.com/Shiba-2-shiba/ComfyUI_FreeU_V2_timestepadd.git
 
 ```
+
+## Usage
+以下の記事で経緯や使用方法について記載していますので参考にしてください。
+https://note.com/gentle_murre488/n/n722f6a73561c
+
+---
+## Reference Script
+以下のスクリプトを参考にしています。
+https://github.com/comfyanonymous/ComfyUI/blob/master/comfy_extras/nodes_freelunch.py#L25
