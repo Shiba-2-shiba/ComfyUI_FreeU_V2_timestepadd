@@ -1,5 +1,6 @@
-from .FreeU_V2_timestepadd import FreeU_V2_timestepadd
+# 正しいファイル名からマッピングをインポートします
+from .FreeU_V2_timestepadd import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
-NODE_CLASS_MAPPINGS = {
-    "FreeU_V2_timestepadd": FreeU_V2_timestepadd,
-}
+# マッピングをComfyUIに公開します
+__all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
+
