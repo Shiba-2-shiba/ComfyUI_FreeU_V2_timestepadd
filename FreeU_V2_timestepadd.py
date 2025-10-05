@@ -1,9 +1,12 @@
 import torch
 import logging
-import comfy.utils
+# V3スキーマで必須となるioをインポートします
+from comfy_api.latest import io
 
+# --- Helper Function (No changes needed) ---
+# このヘルパー関数はV3化による変更は不要です
 def Fourier_filter(x, threshold, scale):
-    # フーリエ変換フィルタリング
+    """Applies a Fourier filter to the input tensor."""
     x_freq = torch.fft.fftn(x.float(), dim=(-2, -1))
     x_freq = torch.fft.fftshift(x_freq, dim=(-2, -1))
 
@@ -14,47 +17,59 @@ def Fourier_filter(x, threshold, scale):
     mask[..., crow - threshold:crow + threshold, ccol - threshold:ccol + threshold] = scale
     x_freq = x_freq * mask
 
-    # 逆フーリエ変換
     x_freq = torch.fft.ifftshift(x_freq, dim=(-2, -1))
     x_filtered = torch.fft.ifftn(x_freq, dim=(-2, -1)).real
 
     return x_filtered.to(x.dtype)
 
-
-class FreeU_V2_timestepadd:
+# ▼▼▼【原則1】io.ComfyNodeを継承するようにクラス定義を変更 ▼▼▼
+class FreeU_V2_timestepadd_V3(io.ComfyNode):
+    # ▼▼▼【原則2】INPUT_TYPESとRETURN_TYPESをdefine_schemaメソッドに集約 ▼▼▼
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "model": ("MODEL",),
-                "b1": ("FLOAT", {"default": 1.3, "min": 0.0, "max": 10.0, "step": 0.01}),
-                "b2": ("FLOAT", {"default": 1.4, "min": 0.0, "max": 10.0, "step": 0.01}),
-                "s1": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 10.0, "step": 0.01}),
-                "s2": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 10.0, "step": 0.01}),
-                "start_percent": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.001}),
-                "end_percent": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.0, "step": 0.001}),
-            }
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            # node_idはクラス名と一致させるのが慣例です
+            node_id="FreeU_V2_timestepadd_V3",
+            # UIに表示されるノード名
+            display_name="FreeU V2 (TimestepAdd) V3",
+            # V1のCATEGORYをここに記述します
+            category="model_patches/unet",
+            
+            # V1のINPUT_TYPESの各項目をioクラスのInputにマッピングします
+            inputs=[
+                io.Model.Input(id="model"),
+                io.Float.Input(id="b1", default=1.3, min=0.0, max=10.0, step=0.01),
+                io.Float.Input(id="b2", default=1.4, min=0.0, max=10.0, step=0.01),
+                io.Float.Input(id="s1", default=0.9, min=0.0, max=10.0, step=0.01),
+                io.Float.Input(id="s2", default=0.2, min=0.0, max=10.0, step=0.01),
+                io.Float.Input(id="start_percent", default=0.0, min=0.0, max=1.0, step=0.001),
+                io.Float.Input(id="end_percent", default=0.35, min=0.0, max=1.0, step=0.001),
+            ],
+            
+            # V1のRETURN_TYPESをioクラスのOutputにマッピングします
+            outputs=[
+                # idは入力と重複しないユニークな名前にします
+                io.Model.Output(id="patched_model", display_name="MODEL"),
+            ]
+        )
 
-    RETURN_TYPES = ("MODEL",)
-    FUNCTION = "patch"
-    CATEGORY = "model_patches/unet"
-
-    def patch(self, model, b1, b2, s1, s2, start_percent, end_percent):
+    # ▼▼▼【原則3】V1のFUNCTIONメソッドを'@classmethod def execute'にリネーム ▼▼▼
+    # 引数名はinputsのidと完全に一致させ、型ヒントを追記します
+    @classmethod
+    def execute(cls, model: 'ModelPatcher', b1: float, b2: float, s1: float, s2: float, start_percent: float, end_percent: float) -> io.NodeOutput:
+        
+        # --- ここから下のコア処理ロジックはV1から一切変更不要です ---
         model_sampling = model.get_model_object("model_sampling")
         sigma_start = model_sampling.percent_to_sigma(start_percent)
         sigma_end = model_sampling.percent_to_sigma(end_percent)
 
-        # モデルのスケーリング情報
         model_channels = model.model.model_config.unet_config["model_channels"]
         scale_dict = {model_channels * 4: (b1, s1), model_channels * 2: (b2, s2)}
         on_cpu_devices = {}
 
-        # 出力ブロックのパッチ
         def output_block_patch(h, hsp, transformer_options):
             sigma = transformer_options["sigmas"][0].item()
 
-            # 指定した範囲内のsigmaに基づいて処理
             if sigma_start >= sigma >= sigma_end:
                 scale = scale_dict.get(int(h.shape[1]), None)
                 if scale is not None:
@@ -69,8 +84,8 @@ class FreeU_V2_timestepadd:
                     if hsp.device not in on_cpu_devices:
                         try:
                             hsp = Fourier_filter(hsp, threshold=1, scale=scale[1])
-                        except:
-                            logging.warning("Device {} does not support the torch.fft functions used in the FreeU node, switching to CPU.".format(hsp.device))
+                        except Exception:
+                            logging.warning(f"Device {hsp.device} does not support torch.fft, switching to CPU for FreeU.")
                             on_cpu_devices[hsp.device] = True
                             hsp = Fourier_filter(hsp.cpu(), threshold=1, scale=scale[1]).to(hsp.device)
                     else:
@@ -78,13 +93,19 @@ class FreeU_V2_timestepadd:
 
             return h, hsp
 
-        # モデルのクローン作成とパッチ適用
         m = model.clone()
         m.set_model_output_block_patch(output_block_patch)
-        return (m, )
+        
+        # ▼▼▼【原則4】戻り値をio.NodeOutputオブジェクトでラップ ▼▼▼
+        # outputsの定義順に合わせて位置引数で値を返します
+        return io.NodeOutput(m)
 
-
-# ノードクラスマッピング
+# ▼▼▼【原則5】ノードの登録方法はV1互換形式を維持 ▼▼▼
+# V3ノードでも、このマッピングがComfyUIにノードを認識させるために重要です。
 NODE_CLASS_MAPPINGS = {
-    "FreeU_V2_timestepadd": FreeU_V2_timestepadd,
+    "FreeU_V2_timestepadd_V3": FreeU_V2_timestepadd_V3
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "FreeU_V2_timestepadd_V3": "FreeU V2 (TimestepAdd) V3"
 }
