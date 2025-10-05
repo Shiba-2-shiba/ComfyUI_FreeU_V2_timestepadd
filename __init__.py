@@ -1,5 +1,6 @@
-# Import the V3 node from the new file
-from .FreeU_V2_timestepadd_v3 import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+# 正しいファイル名からマッピングをインポートします
+from .FreeU_V2_timestepadd import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
-# Expose the mappings to ComfyUI
+# マッピングをComfyUIに公開します
 __all__ = ['NODE_CLASS_MAPPINGS', 'NODE_DISPLAY_NAME_MAPPINGS']
+
