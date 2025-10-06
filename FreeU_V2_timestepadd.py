@@ -83,13 +83,4 @@ class FreeU_V2_timestepadd(io.ComfyNode):
         m.set_model_output_block_patch(output_block_patch)
         return io.NodeOutput(m)
 
-# --- Node Registration for ComfyUI ---
-# V3版のクラスのみを登録します
-NODE_CLASS_MAPPINGS = {
-    "FreeU_V2_timestepadd": FreeU_V2_timestepadd,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "FreeU_V2_timestepadd": "FreeU V2 (TimestepAdd)",
-}
 
