@@ -1,23 +1,28 @@
-# __init__.py (V3 comfy_entrypoint 登録方式)
-# 
-# V3スキーマの作法に則り、ComfyExtensionを定義し、
-# comfy_entrypoint関数からそのインスタンスを返すように変更します。
+# [ファイル名: __init__.py]
+# (変更あり: FreeU_V2_timestepadd をインポートしてリストに追加)
 
-# 1. 必要なV3モジュールと、登録したいノードクラスをインポートします
 from comfy_api.latest import ComfyExtension, io
 from typing_extensions import override
+
+# 1. 各モジュールからノードクラスをインポート
+from .FreeU_B1B2 import FreeU_B_Scaling
+from .FreeU_S1S2 import FreeU_S_Scaling_AdaptiveCap
 from .FreeU_V2_timestepadd import FreeU_V2_timestepadd
 
+
 # 2. ComfyExtensionを継承したクラスを作成します
-class FreeUV2Extension(ComfyExtension):
-    # get_node_listメソッドで、登録したいノードクラスのリストを返します
+class FreeU_Modular_Extension(ComfyExtension): 
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [FreeU_V2_timestepadd]
+        return [
+            FreeU_B_Scaling,
+            FreeU_S_Scaling_AdaptiveCap,
+            FreeU_V2_timestepadd 
+        ]
 
-# 3. comfy_entrypointという名前の非同期関数を定義し、
-#    上で作成したExtensionクラスのインスタンスを返します
-async def comfy_entrypoint() -> FreeUV2Extension:
-    return FreeUV2Extension()
+# 3. comfy_entrypoint
+async def comfy_entrypoint() -> FreeU_Modular_Extension:
+    return FreeU_Modular_Extension()
 
-print("Loaded: FreeU V2 (TimestepAdd) via V3 entrypoint")
+# 3. 読み込まれたことが分かりやすいよう、print文も更新 (任意)
+print("Loaded: FreeU (Modular B/S V5 + V2 Timestep) via V3 entrypoint")
