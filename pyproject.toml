@@ -1,7 +1,7 @@
 [project]
 name = "ComfyUI_FreeU_V2_timestepadd"
 description = "This is a custom node to add timestep for FreeU V2."
-version = "1.0.0"
+version = "2.0.0"
 license = {file = "LICENSE"}
 
 [project.urls]
