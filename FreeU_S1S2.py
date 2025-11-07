@@ -19,19 +19,19 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
             inputs=[
                 io.Model.Input(id="model"),
                 # S (Skip/Fourier)
-                io.Float.Input(id="s1", default=0.9, min=0.0, max=10.0, step=0.01, display_name="S1 (1280ch)"),
-                io.Float.Input(id="s2", default=0.60, min=0.0, max=1.0, step=0.01, display_name="S2 (640ch)"),
+                io.Float.Input(id="s1", default=1.2, min=0.0, max=10.0, step=0.01, display_name="S1 (1280ch)"),
+                io.Float.Input(id="s2", default=0.70, min=0.0, max=5.0, step=0.01, display_name="S2 (640ch)"),
                 
                 # Timesteps
-                io.Float.Input(id="s_start_percent", default=0.0, min=0.0, max=1.0, step=0.001, display_name="S (Fourier) Start %"),
+                io.Float.Input(id="s_start_percent", default=0.6, min=0.0, max=1.0, step=0.001, display_name="S (Fourier) Start %"),
                 io.Float.Input(id="s_end_percent", default=1.0, min=0.0, max=1.0, step=0.001, display_name="S (Fourier) End %"),
                 
                 # Radius Ratios
                 io.Float.Input(id="radius_ratio_1", default=0.08, min=0.01, max=0.5, step=0.01, display_name="S1 (1280ch) Radius Ratio"),
-                io.Float.Input(id="radius_ratio_2", default=0.08, min=0.01, max=0.5, step=0.01, display_name="S2 (640ch) Radius Ratio"),
+                io.Float.Input(id="radius_ratio_2", default=0.06, min=0.01, max=0.5, step=0.01, display_name="S2 (640ch) Radius Ratio"),
 
                 # HFブースト (V4のまま)
-                io.Float.Input(id="hf_boost_s1", default=1.0, min=0.5, max=2.0, step=0.01, 
+                io.Float.Input(id="hf_boost_s1", default=1.2, min=0.5, max=2.0, step=0.01, 
                                display_name="S1 HF Boost (1.0 = Off)"),
                 io.Float.Input(id="hf_boost_s2", default=1.0, min=0.5, max=2.0, step=0.01, 
                                display_name="S2 HF Boost (1.0 = Off)"),
@@ -49,7 +49,7 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
                                display_name="S1 Cap Factor (0.6)"),
                 
                 # S2 (640ch) 用のキャップ設定
-                io.Float.Input(id="cap_threshold_s2", default=0.35, min=0.1, max=1.0, step=0.01, 
+                io.Float.Input(id="cap_threshold_s2", default=0.7, min=0.1, max=1.0, step=0.01, 
                                display_name="S2 Cap Threshold (35%)"),
                 io.Float.Input(id="cap_factor_s2", default=0.6, min=0.1, max=1.0, step=0.01, 
                                display_name="S2 Cap Factor (0.6)"),
@@ -226,4 +226,5 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
 
         m = model.clone()
         m.set_model_output_block_patch(output_block_patch)
+
         return io.NodeOutput(m)
