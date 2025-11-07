@@ -18,6 +18,14 @@ Furthermore, to align with the image generation process of SDXL diffusion models
 For the most ideal effect, it is recommended to apply B1B2 during the first half of the image generation process and the S1S2 node during the latter half.
 
 
+## how to use
+
+使用方法と生成結果例については以下の記事に記載しています。
+
+https://note.com/gentle_murre488/n/nbd3373fb8b8f
+
+Usage instructions and example results are described in the article at the URL linked above
+
 ## Install
 
 
