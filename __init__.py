@@ -7,7 +7,6 @@ from typing_extensions import override
 # 1. 各モジュールからノードクラスをインポート
 from .FreeU_B1B2 import FreeU_B_Scaling
 from .FreeU_S1S2 import FreeU_S_Scaling_AdaptiveCap
-# --- ▼ 1. ここに新しいノードをインポート ▼ ---
 from .FreeU_V2_timestepadd import FreeU_V2_timestepadd
 
 
