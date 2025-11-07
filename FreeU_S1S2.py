@@ -1,4 +1,8 @@
-# [ファイル名: FreeU_S1S2.py]
+# [ファイル名: FreeU_S1S2_Refactored.py]
+# 変更点:
+# 1. UIに表示しない詳細設定をクラス定数として先頭に移動
+# 2. define_schema (UI) を簡素化
+# 3. execute のシグネチャを変更し、クラス定数を参照するように修正
 
 import torch
 import logging
@@ -10,53 +14,62 @@ import math
 from .utils import Fourier_filter_gauss, get_band_energy_stats
 
 class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
+
+    # --- ▼▼▼ UIから削除された詳細設定 ▼▼▼ ---
+    # これらの値はUIに表示されません。
+    # 変更する場合は、このスクリプトファイルを直接編集してください。
+    
+    # S1 (1280ch) 用の固定設定
+    RADIUS_RATIO_1 = 0.08   # S1 (1280ch) Radius Ratio
+    HF_BOOST_S1 = 1.2       # S1 HF Boost (1.0 = Off)
+    CAP_THRESHOLD_S1 = 0.35 # S1 Cap Threshold (35%)
+    CAP_FACTOR_S1 = 0.6     # S1 Cap Factor (0.6)
+    
+    # S2 (640ch) 用の固定設定
+    RADIUS_RATIO_2 = 0.06   # S2 (640ch) Radius Ratio
+    HF_BOOST_S2 = 1.0       # S2 HF Boost (1.0 = Off)
+    CAP_THRESHOLD_S2 = 0.70 # S2 Cap Threshold (70%)
+    CAP_FACTOR_S2 = 0.6     # S2 Cap Factor (0.6)
+    
+    # 汎用設定
+    CHANNEL_THRESHOLD = 96  # Channel Match Threshold (±)
+    
+    # --- ▲▲▲ UIから削除された詳細設定 ▲▲▲ ---
+
+
     @classmethod
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="FreeU_S_Scaling_AdaptiveCap",
-            display_name="FreeU S (Fourier) Adaptive Cap",
+            # (分かりやすいように表示名を変更。元のままでも構いません)
+            display_name="FreeU S (Fourier) Adaptive Cap (Simple)", 
             category="model_patches/unet",
             inputs=[
                 io.Model.Input(id="model"),
-                # S (Skip/Fourier)
+                
+                # S (Skip/Fourier) - UIに残す
                 io.Float.Input(id="s1", default=1.2, min=0.0, max=10.0, step=0.01, display_name="S1 (1280ch)"),
                 io.Float.Input(id="s2", default=0.70, min=0.0, max=5.0, step=0.01, display_name="S2 (640ch)"),
                 
-                # Timesteps
+                # Timesteps - UIに残す
                 io.Float.Input(id="s_start_percent", default=0.6, min=0.0, max=1.0, step=0.001, display_name="S (Fourier) Start %"),
                 io.Float.Input(id="s_end_percent", default=1.0, min=0.0, max=1.0, step=0.001, display_name="S (Fourier) End %"),
                 
-                # Radius Ratios
-                io.Float.Input(id="radius_ratio_1", default=0.08, min=0.01, max=0.5, step=0.01, display_name="S1 (1280ch) Radius Ratio"),
-                io.Float.Input(id="radius_ratio_2", default=0.06, min=0.01, max=0.5, step=0.01, display_name="S2 (640ch) Radius Ratio"),
+                # --- UIから削除された項目 ---
+                # radius_ratio_1, radius_ratio_2
+                # hf_boost_s1, hf_boost_s2
+                # cap_threshold_s1, cap_factor_s1
+                # cap_threshold_s2, cap_factor_s2
+                # channel_threshold
+                # ------------------------------
 
-                # HFブースト (V4のまま)
-                io.Float.Input(id="hf_boost_s1", default=1.2, min=0.5, max=2.0, step=0.01, 
-                               display_name="S1 HF Boost (1.0 = Off)"),
-                io.Float.Input(id="hf_boost_s2", default=1.0, min=0.5, max=2.0, step=0.01, 
-                               display_name="S2 HF Boost (1.0 = Off)"),
-
-                # Adaptive Cap (V4のまま)
+                # Adaptive Cap - UIに残す
                 io.Boolean.Input(id="enable_cap", default=True, 
                                  display_name="Enable Over-attenuation Cap"),
                 io.Boolean.Input(id="adaptive_cap", default=True, 
                                  display_name="Enable Adaptive Cap Factor"),
-
-                # S1 (1280ch) 用のキャップ設定
-                io.Float.Input(id="cap_threshold_s1", default=0.35, min=0.1, max=1.0, step=0.01, 
-                               display_name="S1 Cap Threshold (35%)"),
-                io.Float.Input(id="cap_factor_s1", default=0.6, min=0.1, max=1.0, step=0.01, 
-                               display_name="S1 Cap Factor (0.6)"),
                 
-                # S2 (640ch) 用のキャップ設定
-                io.Float.Input(id="cap_threshold_s2", default=0.7, min=0.1, max=1.0, step=0.01, 
-                               display_name="S2 Cap Threshold (35%)"),
-                io.Float.Input(id="cap_factor_s2", default=0.6, min=0.1, max=1.0, step=0.01, 
-                               display_name="S2 Cap Factor (0.6)"),
-                
-                # --- ▼ 汎用性・デバッグUI (V5) ▼ ---
-                io.Int.Input(id="channel_threshold", default=96, min=0, max=256, 
-                              display_name="Channel Match Threshold (±)"),
+                # Debug - UIに残す
                 io.Boolean.Input(id="verbose_logging", default=False, 
                                  display_name="Enable Verbose Logging"),
             ],
@@ -69,12 +82,14 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
     def execute(cls, model: 'ModelPatcher', 
                 s1: float, s2: float, 
                 s_start_percent: float, s_end_percent: float,
-                radius_ratio_1: float, radius_ratio_2: float,
-                hf_boost_s1: float, hf_boost_s2: float,
+                # --- UIから削除された引数をここからも削除 ---
+                # radius_ratio_1: float, radius_ratio_2: float,
+                # hf_boost_s1: float, hf_boost_s2: float,
                 enable_cap: bool, adaptive_cap: bool,
-                cap_threshold_s1: float, cap_factor_s1: float,
-                cap_threshold_s2: float, cap_factor_s2: float,
-                channel_threshold: int, verbose_logging: bool
+                # cap_threshold_s1: float, cap_factor_s1: float,
+                # cap_threshold_s2: float, cap_factor_s2: float,
+                # channel_threshold: int, 
+                verbose_logging: bool
                 ) -> io.NodeOutput:
         
         model_sampling = model.get_model_object("model_sampling")
@@ -84,10 +99,12 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
         model_channels = model.model.model_config.unet_config["model_channels"]
         
         target_ch_1 = model_channels * 4
-        s_tuple1 = (s1, radius_ratio_1, cap_threshold_s1, cap_factor_s1, hf_boost_s1)
+        # --- ▼ ハードコードされたクラス定数を参照するように変更 ▼ ---
+        s_tuple1 = (s1, cls.RADIUS_RATIO_1, cls.CAP_THRESHOLD_S1, cls.CAP_FACTOR_S1, cls.HF_BOOST_S1)
         
         target_ch_2 = model_channels * 2
-        s_tuple2 = (s2, radius_ratio_2, cap_threshold_s2, cap_factor_s2, hf_boost_s2)
+        # --- ▼ ハードコードされたクラス定数を参照するように変更 ▼ ---
+        s_tuple2 = (s2, cls.RADIUS_RATIO_2, cls.CAP_THRESHOLD_S2, cls.CAP_FACTOR_S2, cls.HF_BOOST_S2)
 
         on_cpu_devices = {} 
         MAX_CAP_ITER = 3 # ▼【安定性】 キャップの最大反復回数
@@ -98,12 +115,14 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
             # ▼【汎用性】 近傍マッチ
             ch = int(h.shape[1])
             scale_tuple = None
-            if abs(ch - target_ch_1) <= channel_threshold:
+            # --- ▼ ハードコードされたクラス定数を参照するように変更 ▼ ---
+            if abs(ch - target_ch_1) <= cls.CHANNEL_THRESHOLD:
                 scale_tuple = s_tuple1
-            elif abs(ch - target_ch_2) <= channel_threshold:
+            elif abs(ch - target_ch_2) <= cls.CHANNEL_THRESHOLD:
                 scale_tuple = s_tuple2
 
             if scale_tuple is not None:
+                # --- ▼ s_scale以外はクラス定数由来の値がここに入る ---
                 s_scale, radius_ratio, cap_thresh, cap_fact, hf_boost = scale_tuple
 
                 # --- B-Scaling (h) は変更せず、パススルー ---
@@ -117,6 +136,7 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
                     lf_e_before, hf_e_before, cover_rate = get_band_energy_stats(hsp, R_eff)
                     ratio_before = lf_e_before / hf_e_before if hf_e_before > 1e-6 else float('inf')
 
+                    # 'verbose_logging' は execute の引数からスコープキャプチャされる
                     if verbose_logging:
                         logging.info(f"[FreeU_S-Cap] Mask | Sigma:{sigma:.4f}, Ch:{ch}, HxW:{H}x{W}, R_Ratio:{radius_ratio:.3f}, Eff_R:{R_eff}px, Cover:{cover_rate:.2f}%")
                         logging.info(f"    -> Energy Before | LF: {lf_e_before:.4e}, HF: {hf_e_before:.4e}, Ratio(LF/HF): {ratio_before:.4f}")
@@ -153,6 +173,7 @@ class FreeU_S_Scaling_AdaptiveCap(io.ComfyNode):
                     iters = 0
 
                     # --- ▼【安定性】 2nd Pass (反復型キャップ処理) ▼ ---
+                    # 'enable_cap' と 'adaptive_cap' は execute の引数からスコープキャプチャされる
                     while (enable_cap and 
                            drop > cap_thresh and         # 閾値を超えている
                            current_s_scale < 0.999 and   # スケールが1.0未満（補正可能）
