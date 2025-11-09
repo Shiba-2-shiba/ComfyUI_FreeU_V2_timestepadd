@@ -1,14 +1,14 @@
 [project]
-name = "ComfyUI_FreeU_V2_timestepadd"
+name = "ComfyUI_FreeU_V2_advanced"
 description = "This is a custom node to add timestep for FreeU V2."
 version = "2.0.0"
 license = {file = "LICENSE"}
 
 [project.urls]
-Repository = "https://github.com/Shiba-2-shiba/ComfyUI_FreeU_V2_timestepadd"
+Repository = "https://github.com/Shiba-2-shiba/ComfyUI_FreeU_V2_advanced"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
 PublisherId = "shiba2shiba"
-DisplayName = "ComfyUI_FreeU_V2_timestepadd"
+DisplayName = "ComfyUI_FreeU_V2_advanced"
 Icon = ""
